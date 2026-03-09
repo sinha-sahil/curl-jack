@@ -1,0 +1,14 @@
+[package]
+name = "curl-jack"
+version = "0.1.0"
+edition = "2021"
+description = "Parse curl command strings into a typed schema, serialize as JSON, and execute HTTP requests"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+reqwest = { version = "0.12", features = ["json", "multipart", "cookies"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
+thiserror = "2"
+shell-words = "1"
