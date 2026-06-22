@@ -3,7 +3,7 @@ pub mod execute;
 pub mod parse;
 pub mod schema;
 
-pub use error::{CurlJackError, Result};
+pub use error::{WireJackError, Result};
 pub use execute::CurlResponse;
 pub use parse::{parse, parse_response};
 pub use schema::{

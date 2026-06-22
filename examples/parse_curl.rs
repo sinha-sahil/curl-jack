@@ -40,7 +40,7 @@ fn main() {
     let is_tty = io::stdin().is_terminal();
 
     if is_tty {
-        println!("curl-jack parser (type \"quit\" or \"exit\" to stop)");
+        println!("wire-jack parser (type \"quit\" or \"exit\" to stop)");
         if json_mode {
             println!("  (JSON output mode)");
         }
@@ -93,7 +93,7 @@ fn main() {
             continue;
         }
 
-        match curl_jack::parse(input) {
+        match wire_jack::parse(input) {
             Ok(request) => {
                 if json_mode {
                     match serde_json::to_string_pretty(&request) {

@@ -1,5 +1,5 @@
 [package]
-name = "curl-jack"
+name = "wire-jack"
 version = "0.1.0"
 edition = "2021"
 description = "Parse curl command strings into a typed schema, serialize as JSON, and execute HTTP requests"

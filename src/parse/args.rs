@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::error::{CurlJackError, Result};
+use crate::error::{WireJackError, Result};
 use crate::schema::{
     generate_body_schema, Auth, Body, Cookie, CurlRequest, FormField, FormValue, Header,
     HttpMethod,
@@ -132,7 +132,7 @@ pub fn parse_args(tokens: Vec<String>) -> Result<CurlRequest> {
     }
 
     if req.url.is_empty() {
-        return Err(CurlJackError::MissingUrl);
+        return Err(WireJackError::MissingUrl);
     }
 
     // Extract query params from URL
@@ -184,13 +184,13 @@ pub fn parse_args(tokens: Vec<String>) -> Result<CurlRequest> {
 
 fn next_arg(iter: &mut impl Iterator<Item = String>, flag: &str) -> Result<String> {
     iter.next()
-        .ok_or_else(|| CurlJackError::Parse(format!("flag '{flag}' requires a value")))
+        .ok_or_else(|| WireJackError::Parse(format!("flag '{flag}' requires a value")))
 }
 
 fn parse_header(s: &str) -> Result<Header> {
     let (name, value) = s
         .split_once(':')
-        .ok_or_else(|| CurlJackError::InvalidHeader(s.to_string()))?;
+        .ok_or_else(|| WireJackError::InvalidHeader(s.to_string()))?;
     Ok(Header {
         name: name.trim().to_string(),
         value: value.trim().to_string(),
@@ -227,7 +227,7 @@ fn parse_cookies(s: &str) -> Vec<Cookie> {
 fn parse_form_field(s: &str) -> Result<FormField> {
     let (name, value) = s
         .split_once('=')
-        .ok_or_else(|| CurlJackError::Parse(format!("invalid form field: {s}")))?;
+        .ok_or_else(|| WireJackError::Parse(format!("invalid form field: {s}")))?;
 
     let form_value = if let Some(rest) = value.strip_prefix('@') {
         if let Some((path, type_part)) = rest.split_once(";type=") {

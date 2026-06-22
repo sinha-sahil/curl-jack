@@ -1,4 +1,4 @@
-use curl_jack::{parse, parse_response, Body, CurlRequest};
+use wire_jack::{parse, parse_response, Body, CurlRequest};
 
 /// Helper: print a divider with a title
 fn step(n: u8, title: &str) {
@@ -25,7 +25,7 @@ async fn e2e_post_user_template_hydrate_execute() {
     print!("{template}");
 
     // Verify the template was parsed correctly
-    assert_eq!(template.method, curl_jack::HttpMethod::POST);
+    assert_eq!(template.method, wire_jack::HttpMethod::POST);
     assert_eq!(
         template.url,
         "https://jsonplaceholder.typicode.com/users"
@@ -77,7 +77,7 @@ async fn e2e_post_user_template_hydrate_execute() {
 
     step(4, "Execute the hydrated request");
 
-    let raw_response = curl_jack::execute(&hydrated)
+    let raw_response = wire_jack::execute(&hydrated)
         .await
         .expect("request failed");
 
@@ -101,11 +101,11 @@ async fn e2e_post_user_template_hydrate_execute() {
     assert_eq!(parsed.status_text, "Created");
     assert_eq!(
         parsed.status_class,
-        curl_jack::StatusClass::Success
+        wire_jack::StatusClass::Success
     );
 
     // The response body should be JSON with our data echoed back + an assigned id
-    if let curl_jack::ResponseBody::Json(ref body) = parsed.body {
+    if let wire_jack::ResponseBody::Json(ref body) = parsed.body {
         assert_eq!(body["name"], "Sahil Sinha");
         assert_eq!(body["username"], "sahil.sinha");
         assert_eq!(body["email"], "sahil@curljack.dev");
@@ -138,7 +138,7 @@ async fn e2e_get_user_route_param_hydrate() {
     assert_eq!(template.route_params[0].segment, "1");
     assert_eq!(
         template.route_params[0].kind,
-        curl_jack::RouteParamKind::Integer
+        wire_jack::RouteParamKind::Integer
     );
     assert_eq!(
         template.route_template.as_deref(),
@@ -161,13 +161,13 @@ async fn e2e_get_user_route_param_hydrate() {
 
     step(3, "Execute and parse response");
 
-    let raw = curl_jack::execute(&hydrated).await.expect("request failed");
+    let raw = wire_jack::execute(&hydrated).await.expect("request failed");
     let parsed = parse_response(&raw);
     print!("{parsed}");
 
     assert_eq!(parsed.status, 200);
 
-    if let curl_jack::ResponseBody::Json(ref body) = parsed.body {
+    if let wire_jack::ResponseBody::Json(ref body) = parsed.body {
         assert_eq!(body["id"], 3, "should get user with id 3");
         assert!(body["name"].is_string());
         println!("\nFetched user: {} (id={})", body["name"], body["id"]);

@@ -1,8 +1,8 @@
-# curl-jack
+# wire-jack
 
 Parse curl command strings into a typed schema, serialize as JSON, and execute HTTP requests.
 
-`curl-jack` takes a raw `curl` command — the kind you copy from browser DevTools or API docs — and turns it into a structured, serializable Rust type. From there you can inspect it, modify it, serialize it to JSON, and execute it.
+`wire-jack` takes a raw `curl` command — the kind you copy from browser DevTools or API docs — and turns it into a structured, serializable Rust type. From there you can inspect it, modify it, serialize it to JSON, and execute it.
 
 ## Features
 
@@ -21,7 +21,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-curl-jack = "0.1.0"
+wire-jack = "0.1.0"
 ```
 
 ## Quick Start
@@ -29,7 +29,7 @@ curl-jack = "0.1.0"
 ### Parse a curl command
 
 ```rust
-use curl_jack::parse;
+use wire_jack::parse;
 
 let req = parse(r#"
     curl -X POST https://api.example.com/users \
@@ -55,7 +55,7 @@ println!("{req}");
 ### Serialize to JSON and hydrate
 
 ```rust
-use curl_jack::{parse, CurlRequest, Body};
+use wire_jack::{parse, CurlRequest, Body};
 
 let template = parse("curl -X POST -H 'Content-Type: application/json' -d '{\"name\":\"Alice\"}' https://api.example.com/users").unwrap();
 
@@ -70,7 +70,7 @@ req.body = Some(Body::Json(serde_json::json!({"name": "Bob"})));
 ### Execute a request
 
 ```rust
-use curl_jack::{parse, execute, parse_response};
+use wire_jack::{parse, execute, parse_response};
 
 #[tokio::main]
 async fn main() {
@@ -89,7 +89,7 @@ async fn main() {
 ### Route parameter detection
 
 ```rust
-use curl_jack::parse;
+use wire_jack::parse;
 
 let req = parse("curl https://api.example.com/users/42/posts").unwrap();
 

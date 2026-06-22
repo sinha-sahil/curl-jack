@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum CurlJackError {
+pub enum WireJackError {
     #[error("parse error: {0}")]
     Parse(String),
 
@@ -21,4 +21,4 @@ pub enum CurlJackError {
     Io(#[from] std::io::Error),
 }
 
-pub type Result<T> = std::result::Result<T, CurlJackError>;
+pub type Result<T> = std::result::Result<T, WireJackError>;

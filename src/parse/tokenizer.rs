@@ -1,4 +1,4 @@
-use crate::error::{CurlJackError, Result};
+use crate::error::{WireJackError, Result};
 
 /// Replace `\<newline>` line continuations only when outside of quotes.
 /// Inside single or double quotes, `\<newline>` is preserved as-is.
@@ -39,7 +39,7 @@ pub fn tokenize(input: &str) -> Result<Vec<String>> {
     let input = input.strip_prefix('$').unwrap_or(input).trim();
     let input = strip_continuations(input);
 
-    shell_words::split(&input).map_err(|e| CurlJackError::Tokenize(e.to_string()))
+    shell_words::split(&input).map_err(|e| WireJackError::Tokenize(e.to_string()))
 }
 
 #[cfg(test)]
