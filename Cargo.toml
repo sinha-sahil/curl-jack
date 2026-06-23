@@ -2,13 +2,16 @@
 name = "wire-jack"
 version = "0.1.0"
 edition = "2021"
-description = "Parse curl command strings into a typed schema, serialize as JSON, and execute HTTP requests"
+description = "Construct API-call contracts with temple-dsl, render them against inputs, and execute the resulting requests"
 license = "MIT"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.12", features = ["json", "multipart", "cookies"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "time"] }
 thiserror = "2"
-shell-words = "1"
+base64 = "0.22"
+temple-dsl = { git = "https://github.com/sinha-sahil/temple-dsl", branch = "release", features = [
+    "json",
+] }
