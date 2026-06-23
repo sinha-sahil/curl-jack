@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 description = "Construct API-call contracts with temple-dsl, render them against inputs, and execute the resulting requests"
 license = "MIT"
+repository = "https://github.com/sinha-sahil/wire-jack"
+readme = "README.md"
+keywords = ["http", "api", "template", "curl", "reqwest"]
+categories = ["web-programming::http-client", "template-engine"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -17,9 +21,7 @@ tokio = { version = "1", features = [
 ] }
 thiserror = "2"
 base64 = "0.22"
-temple-dsl = { git = "https://github.com/sinha-sahil/temple-dsl", branch = "release", features = [
-    "json",
-] }
+temple-dsl = { version = "0.3", features = ["json"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["net", "io-util"] }

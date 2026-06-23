@@ -19,8 +19,12 @@ const CONTRACT: &str = r#"{{
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let template = Template::compile(CONTRACT)
-        .map_err(|e| e.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n"))?;
+    let template = Template::compile(CONTRACT).map_err(|e| {
+        e.iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
 
     for id in [1, 2] {
         let output = run(&template, Value::obj([("id", Value::Int(id))])).await?;

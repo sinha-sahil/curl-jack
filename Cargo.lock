@@ -1455,7 +1455,8 @@ dependencies = [
 [[package]]
 name = "temple-dsl"
 version = "0.3.0"
-source = "git+https://github.com/sinha-sahil/temple-dsl?branch=release#6ef3c5eb1fab4a967a0f543402fa5ff8a5547b65"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a849f58794988abfca6888d82ea164bf1f27cde296e057b84bff16cd2da52796"
 dependencies = [
  "ciborium",
  "indexmap",

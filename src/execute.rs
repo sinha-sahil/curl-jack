@@ -11,7 +11,11 @@ use crate::response::ApiResponse;
 
 pub async fn execute(req: &ApiRequest) -> Result<ApiResponse> {
     let client = build_client(req)?;
-    let max_attempts = req.retry.as_ref().map(|r| r.max_attempts.max(1)).unwrap_or(1);
+    let max_attempts = req
+        .retry
+        .as_ref()
+        .map(|r| r.max_attempts.max(1))
+        .unwrap_or(1);
 
     let mut attempt = 0;
     loop {
@@ -58,11 +62,16 @@ fn build_client(req: &ApiRequest) -> Result<Client> {
 }
 
 async fn build_request(client: &Client, req: &ApiRequest) -> Result<RequestBuilder> {
-    let method = Method::from_bytes(req.method.to_ascii_uppercase().as_bytes()).unwrap_or(Method::GET);
+    let method =
+        Method::from_bytes(req.method.to_ascii_uppercase().as_bytes()).unwrap_or(Method::GET);
     let mut builder = client.request(method, &req.url);
 
     if !req.query.is_empty() {
-        let pairs: Vec<(&str, &str)> = req.query.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        let pairs: Vec<(&str, &str)> = req
+            .query
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect();
         builder = builder.query(&pairs);
     }
 
@@ -80,7 +89,12 @@ async fn build_request(client: &Client, req: &ApiRequest) -> Result<RequestBuild
     }
 
     if !req.cookies.is_empty() {
-        let jar = req.cookies.iter().map(|(k, v)| format!("{k}={v}")).collect::<Vec<_>>().join("; ");
+        let jar = req
+            .cookies
+            .iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect::<Vec<_>>()
+            .join("; ");
         builder = builder.header(COOKIE, jar);
     }
 
@@ -90,13 +104,21 @@ async fn build_request(client: &Client, req: &ApiRequest) -> Result<RequestBuild
                 builder = builder.bearer_auth(token);
             }
         } else if auth.scheme.eq_ignore_ascii_case("basic") {
-            builder = builder.basic_auth(auth.username.clone().unwrap_or_default(), auth.password.clone());
+            builder = builder.basic_auth(
+                auth.username.clone().unwrap_or_default(),
+                auth.password.clone(),
+            );
         }
     }
 
     if let Some(body) = &req.body {
         let media = explicit_ct.unwrap_or_else(|| "application/json".to_string());
-        let base = media.split(';').next().unwrap_or("").trim().to_ascii_lowercase();
+        let base = media
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
         match base.as_str() {
             "application/x-www-form-urlencoded" => {
                 builder = builder.form(&form_pairs(body));
@@ -105,7 +127,9 @@ async fn build_request(client: &Client, req: &ApiRequest) -> Result<RequestBuild
                 builder = builder.multipart(build_multipart(body).await?);
             }
             "application/json" => {
-                builder = builder.header(CONTENT_TYPE, media).body(serde_json::to_vec(body).unwrap_or_default());
+                builder = builder
+                    .header(CONTENT_TYPE, media)
+                    .body(serde_json::to_vec(body).unwrap_or_default());
             }
             b if is_binary(b) => {
                 let decoded = base64::engine::general_purpose::STANDARD
@@ -167,13 +191,25 @@ async fn build_response(resp: reqwest::Response, start: Instant) -> Result<ApiRe
     })
 }
 
-fn classify_body(content_type: Option<&str>, bytes: &[u8]) -> (Option<String>, Option<serde_json::Value>) {
+fn classify_body(
+    content_type: Option<&str>,
+    bytes: &[u8],
+) -> (Option<String>, Option<serde_json::Value>) {
     if bytes.is_empty() {
         return (None, None);
     }
-    let media = content_type.map(|s| s.split(';').next().unwrap_or("").trim().to_ascii_lowercase());
+    let media = content_type.map(|s| {
+        s.split(';')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase()
+    });
 
-    if media.as_deref().is_some_and(|m| m == "application/json" || m.ends_with("+json")) {
+    if media
+        .as_deref()
+        .is_some_and(|m| m == "application/json" || m.ends_with("+json"))
+    {
         if let Ok(value) = serde_json::from_slice(bytes) {
             return (None, Some(value));
         }
@@ -216,7 +252,10 @@ fn is_binary(media: &str) -> bool {
 
 fn form_pairs(body: &serde_json::Value) -> Vec<(String, String)> {
     match body.as_object() {
-        Some(map) => map.iter().map(|(k, v)| (k.clone(), json_to_string(v))).collect(),
+        Some(map) => map
+            .iter()
+            .map(|(k, v)| (k.clone(), json_to_string(v)))
+            .collect(),
         None => Vec::new(),
     }
 }
@@ -225,7 +264,11 @@ async fn build_multipart(body: &serde_json::Value) -> Result<reqwest::multipart:
     let mut form = reqwest::multipart::Form::new();
     if let Some(map) = body.as_object() {
         for (key, value) in map {
-            if let Some(path) = value.as_object().and_then(|o| o.get("$file")).and_then(|p| p.as_str()) {
+            if let Some(path) = value
+                .as_object()
+                .and_then(|o| o.get("$file"))
+                .and_then(|p| p.as_str())
+            {
                 let bytes = tokio::fs::read(path).await?;
                 let filename = std::path::Path::new(path)
                     .file_name()
@@ -249,7 +292,9 @@ fn json_to_string(value: &serde_json::Value) -> String {
 }
 
 fn should_retry_status(req: &ApiRequest, status: u16) -> bool {
-    req.retry.as_ref().is_some_and(|r| r.retry_on_status.contains(&status))
+    req.retry
+        .as_ref()
+        .is_some_and(|r| r.retry_on_status.contains(&status))
 }
 
 fn backoff_delay(req: &ApiRequest, attempt: u32) -> Duration {
@@ -287,8 +332,14 @@ mod tests {
 
     #[test]
     fn classifies_binary_and_empty_as_neither() {
-        assert_eq!(classify_body(Some("application/octet-stream"), &[0, 159, 146]).0, None);
-        assert_eq!(classify_body(Some("application/octet-stream"), &[0, 159, 146]).1, None);
+        assert_eq!(
+            classify_body(Some("application/octet-stream"), &[0, 159, 146]).0,
+            None
+        );
+        assert_eq!(
+            classify_body(Some("application/octet-stream"), &[0, 159, 146]).1,
+            None
+        );
         assert_eq!(classify_body(Some("application/json"), b"").1, None);
     }
 

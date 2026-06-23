@@ -13,7 +13,9 @@ async fn run_contract_live() {
     )
     .unwrap();
 
-    let out = run(&template, Value::obj([("id", Value::Int(1))])).await.unwrap();
+    let out = run(&template, Value::obj([("id", Value::Int(1))]))
+        .await
+        .unwrap();
     assert_eq!(out["id"], serde_json::json!(1));
     assert_eq!(out["ok"], serde_json::json!(true));
 }
