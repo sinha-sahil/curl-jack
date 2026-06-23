@@ -1,0 +1,79 @@
+use temple_dsl::{Template, Value};
+
+use crate::error::{Result, WireJackError};
+use crate::request::ApiRequest;
+use crate::response::ApiResponse;
+
+const PHASE_REQUEST: &str = "request";
+const PHASE_RESPONSE: &str = "response";
+
+fn render_request(template: &Template, data: impl Into<Value>) -> Result<ApiRequest> {
+    let input = Value::obj([
+        ("phase", Value::Str(PHASE_REQUEST.into())),
+        ("request", data.into()),
+    ]);
+    template
+        .render(input)
+        .map_err(|e| WireJackError::Render(e.to_string()))
+}
+
+fn render_response(template: &Template, response: &ApiResponse) -> Result<serde_json::Value> {
+    let response_value: Value = serde_json::to_value(response)
+        .map_err(|e| WireJackError::Render(e.to_string()))?
+        .into();
+    let input = Value::obj([
+        ("phase", Value::Str(PHASE_RESPONSE.into())),
+        ("response", response_value),
+    ]);
+    template
+        .render_value(input)
+        .map(Into::into)
+        .map_err(|e| WireJackError::Render(e.to_string()))
+}
+
+pub async fn run(template: &Template, data: impl Into<Value>) -> Result<serde_json::Value> {
+    let request = render_request(template, data)?;
+    let response = crate::execute(&request).await?;
+    render_response(template, &response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn contract() -> Template {
+        Template::compile(
+            r#"{{
+                input.phase == "request"
+                  ? {
+                      "url": concat("https://api.example.com/users/", to_string(input.request.id)),
+                      "method": "GET"
+                    }
+                  : {
+                      "userId": input.response.body_json.id,
+                      "ok": input.response.ok
+                    }
+            }}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn renders_request_phase_into_api_request() {
+        let req = render_request(&contract(), Value::obj([("id", Value::Int(7))])).unwrap();
+        assert_eq!(req.url, "https://api.example.com/users/7");
+        assert_eq!(req.method, "GET");
+    }
+
+    #[test]
+    fn renders_response_phase_free_form() {
+        let response = ApiResponse {
+            ok: true,
+            body_json: Some(serde_json::json!({ "id": 7 })),
+            ..Default::default()
+        };
+        let out = render_response(&contract(), &response).unwrap();
+        assert_eq!(out["userId"], serde_json::json!(7));
+        assert_eq!(out["ok"], serde_json::json!(true));
+    }
+}

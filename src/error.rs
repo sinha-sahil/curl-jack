@@ -2,6 +2,9 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum WireJackError {
+    #[error("render error: {0}")]
+    Render(String),
+
     #[error("request error: {0}")]
     Request(#[from] reqwest::Error),
 

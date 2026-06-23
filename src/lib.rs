@@ -4,24 +4,26 @@
 //! template, render it against runtime inputs into a typed [`ApiRequest`], and
 //! execute the resulting request.
 //!
-//! A template is the contract: compile it once with [`Template::compile`],
-//! persist its compiled form ([`Template::to_bytes`] / [`Template::from_bytes`]),
-//! and render it against many inputs:
+//! A single template is the contract — it branches on a `phase` flag to map both
+//! sides of a call: the request phase renders user data into an [`ApiRequest`],
+//! the response phase renders the [`ApiResponse`] into a free-form output. Give a
+//! template and call [`run`].
 //!
 //! ```text
-//! author template -> compile -> [persist] -> render(input) -> ApiRequest -> execute
+//! run(template, data): render request -> ApiRequest -> execute -> ApiResponse -> render response
 //! ```
 
 pub mod error;
 pub mod execute;
+mod render;
 pub mod request;
 pub mod response;
 
 pub use error::{Result, WireJackError};
+pub use render::run;
 pub use request::{ApiRequest, Auth, Retry};
 pub use response::ApiResponse;
 
-/// The template (the contract) and dynamic value type, re-exported from temple-dsl.
 pub use temple_dsl::{Template, Value};
 
 pub async fn execute(req: &ApiRequest) -> Result<ApiResponse> {
