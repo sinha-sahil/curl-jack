@@ -1,137 +1,112 @@
 # wire-jack
 
-Parse curl command strings into a typed schema, serialize as JSON, and execute HTTP requests.
+Shape an API call with a [temple-dsl](https://github.com/sinha-sahil/temple-dsl) template, render it against runtime inputs into a typed request, and execute the result.
 
-`wire-jack` takes a raw `curl` command — the kind you copy from browser DevTools or API docs — and turns it into a structured, serializable Rust type. From there you can inspect it, modify it, serialize it to JSON, and execute it.
+A temple-dsl template is the contract: it describes how to build an API call from some input. You author it once, persist its compiled form, and render it against many inputs — each render produces a typed `ApiRequest`, which the executor sends and turns into an `ApiResponse`.
 
-## Features
-
-- **Parse curl commands** — Handles shell quoting, escaping, backslash continuations, and `$` / `curl` prefixes
-- **Typed schema** — Method, URL, headers, auth, body (JSON, form-urlencoded, multipart, raw, binary), cookies, query params, and options like proxy/timeouts
-- **Route parameter detection** — Automatically identifies dynamic path segments (integer, UUID, hex, slug) and generates route templates
-- **Query parameter parsing** — Extracts and type-infers query params (string, integer, boolean, nested JSON)
-- **Body schema generation** — Produces a structural schema for JSON request/response bodies
-- **Serde round-trip** — `CurlRequest` serializes to/from JSON, making it easy to store and hydrate templates
-- **Execute requests** — Run any `CurlRequest` via reqwest and get a structured `ParsedResponse` with status, headers, cookies, body, and schema
-- **Pretty display** — Human-readable `Display` output for both requests and responses
+```text
+author template → compile → [persist] → render(input) → ApiRequest → execute → ApiResponse
+```
 
 ## Installation
-
-Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 wire-jack = "0.1.0"
 ```
 
-## Quick Start
-
-### Parse a curl command
+## Usage
 
 ```rust
-use wire_jack::parse;
+use wire_jack::{execute, ApiRequest, Template, Value};
 
-let req = parse(r#"
-    curl -X POST https://api.example.com/users \
-      -H 'Content-Type: application/json' \
-      -H 'Authorization: Bearer token123' \
-      -d '{"name": "Alice", "email": "alice@example.com"}'
-"#).unwrap();
+// A temple-dsl template that shapes an API call from input.
+let template = Template::compile(r#"
+    {
+      "url":     {{ concat("https://api.example.com/users/", to_string(input.id)) }},
+      "method":  "GET",
+      "headers": { "Authorization": {{ concat("Bearer ", input.token) }} }
+    }
+"#)?;
 
-println!("{req}");
-// POST https://api.example.com/users
-//
-// Headers
-//   Content-Type  : application/json
-//   Authorization : Bearer token123
-//
-// Body (JSON)
-//   {
-//     "email": "alice@example.com",
-//     "name": "Alice"
-//   }
+// Persist the compiled template (e.g. into a BYTEA/BLOB column)...
+let blob = template.to_bytes();
+let template = Template::from_bytes(&blob)?;
+
+// ...render it against an input to produce a typed request...
+let request: ApiRequest = template.render(Value::obj([
+    ("id",    Value::Int(42)),
+    ("token", Value::Str("abc".into())),
+]))?;
+
+// ...and execute it.
+let response = execute(&request).await?;
+assert!(response.ok);
 ```
 
-### Serialize to JSON and hydrate
+Use `template.render_value(input)` to get the dynamic `Value` back instead of deserializing into `ApiRequest`.
 
-```rust
-use wire_jack::{parse, CurlRequest, Body};
+## ApiRequest
 
-let template = parse("curl -X POST -H 'Content-Type: application/json' -d '{\"name\":\"Alice\"}' https://api.example.com/users").unwrap();
+The render target. Every field has a default, so a template only sets the keys it cares about.
 
-// Serialize to JSON for storage
-let json = serde_json::to_string_pretty(&template).unwrap();
+| Field | Type | Notes |
+|---|---|---|
+| `url` | `String` | required |
+| `method` | `String` | defaults to `"GET"` |
+| `headers` | `BTreeMap<String, String>` | |
+| `query` | `BTreeMap<String, String>` | |
+| `cookies` | `BTreeMap<String, String>` | sent as a `Cookie` header |
+| `body` | `Option<serde_json::Value>` | free-form; encoding chosen by `Content-Type` (see below) |
+| `auth` | `Option<Auth>` | `{ scheme, token, username, password }` — `scheme` is `"bearer"` or `"basic"` |
+| `timeout_ms` | `Option<u64>` | total request timeout |
+| `follow_redirects` | `Option<bool>` | |
+| `max_redirects` | `Option<u32>` | |
+| `proxy` | `Option<String>` | |
+| `insecure` | `Option<bool>` | skip TLS verification |
+| `retry` | `Option<Retry>` | `{ max_attempts, backoff, delay_ms, max_delay_ms, retry_on_status }` |
 
-// Later, deserialize and modify
-let mut req: CurlRequest = serde_json::from_str(&json).unwrap();
-req.body = Some(Body::Json(serde_json::json!({"name": "Bob"})));
-```
+### Body encoding
 
-### Execute a request
+The request "type" is not a field — it is whatever `Content-Type` says. The executor encodes `body` accordingly:
 
-```rust
-use wire_jack::{parse, execute, parse_response};
-
-#[tokio::main]
-async fn main() {
-    let req = parse("curl https://jsonplaceholder.typicode.com/users/1").unwrap();
-    let raw = execute(&req).await.unwrap();
-    let response = parse_response(&raw);
-
-    println!("{response}");
-    // 200 OK (Success)  <- 123ms
-    //
-    // Body (JSON)
-    //   { "id": 1, "name": "Leanne Graham", ... }
-}
-```
-
-### Route parameter detection
-
-```rust
-use wire_jack::parse;
-
-let req = parse("curl https://api.example.com/users/42/posts").unwrap();
-
-assert_eq!(req.route_template.as_deref(), Some("https://api.example.com/users/:id/posts"));
-assert_eq!(req.route_params[0].segment, "42");
-```
-
-## Supported curl flags
-
-| Flag | Description |
+| `Content-Type` | Encoding |
 |---|---|
-| `-X`, `--request` | HTTP method |
-| `-H`, `--header` | Request header |
-| `-d`, `--data`, `--data-raw`, `--data-binary` | Request body |
-| `-F`, `--form` | Multipart form field |
-| `-u`, `--user` | Basic auth (`user:pass`) |
-| `-b`, `--cookie` | Send cookies |
-| `-L`, `--location` | Follow redirects |
-| `--max-redirs` | Max redirect count |
-| `-k`, `--insecure` | Skip TLS verification |
-| `--compressed` | Request compressed response |
-| `--connect-timeout` | Connection timeout (seconds) |
-| `-m`, `--max-time` | Max request time (seconds) |
-| `-x`, `--proxy` | Proxy URL |
-| `-A`, `--user-agent` | User-Agent header |
-| `-e`, `--referer` | Referer header |
-| `-o`, `--output` | Write response to file |
-| `--url` | Explicit URL |
+| absent (body present) | `application/json` |
+| `application/json` | JSON-serialized |
+| `application/x-www-form-urlencoded` | object → `k=v&…` |
+| `multipart/form-data` | object; a value `{ "$file": "/path" }` becomes a file part, anything else a text part |
+| binary (`application/octet-stream`, `image/*`, …) | body is a base64 string, decoded to bytes |
+| `text/*`, `application/xml`, … | string sent verbatim; non-string JSON-encoded |
 
-## Interactive REPL
+### Retries
 
-The included example provides an interactive parser:
+`retry` drives resilience: up to `max_attempts`, retrying on a transport error or any status in `retry_on_status`, with `"fixed"` or `"exponential"` `backoff` (base `delay_ms`, capped by `max_delay_ms`).
 
-```sh
-cargo run --example parse_curl
-# curl> curl -X POST -d '{"a":1}' https://example.com
-# POST https://example.com
-# ...
+## ApiResponse
 
-# JSON output mode:
-cargo run --example parse_curl -- --json
-```
+| Field | Type | Notes |
+|---|---|---|
+| `status` | `u16` | |
+| `status_text` | `String` | reason phrase |
+| `ok` | `bool` | `true` for 2xx |
+| `headers` | `BTreeMap<String, String>` | |
+| `content_type` | `Option<String>` | |
+| `content_length` | `Option<u64>` | |
+| `cookies` | `BTreeMap<String, String>` | from `Set-Cookie` |
+| `body_text` | `Option<String>` | set for non-JSON text |
+| `body_json` | `Option<serde_json::Value>` | set for JSON |
+| `elapsed_ms` | `u64` | |
+
+`body_text` and `body_json` are mutually exclusive: a JSON response populates `body_json`, other text populates `body_text`, and binary/empty bodies leave both `None`.
+
+## How it works
+
+- **Template** — re-exported `temple_dsl::Template`; `compile`, `render`, `render_value`, `to_bytes`, `from_bytes`. This is the contract.
+- **Schema** (`src/request.rs`, `src/response.rs`) — `ApiRequest` (render target) and `ApiResponse`.
+- **Execute** (`src/execute.rs`) — reqwest-backed; encodes the request by `Content-Type`, applies auth/cookies/transport options and retries, and classifies the response body.
+
+See [temple-dsl](https://github.com/sinha-sahil/temple-dsl) for the template language reference.
 
 ## License
 
