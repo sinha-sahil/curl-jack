@@ -4,8 +4,15 @@ use wire_jack::{run, Template, Value};
 mod common;
 
 async fn run_contract(src: &str, data: Value) -> serde_json::Value {
-    let template = Template::compile(src)
-        .unwrap_or_else(|e| panic!("{}", e.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n")));
+    let template = Template::compile(src).unwrap_or_else(|e| {
+        panic!(
+            "{}",
+            e.iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join("\n")
+        )
+    });
     run(&template, data).await.unwrap()
 }
 
@@ -56,7 +63,10 @@ async fn post_json_body() {
     let echo = &out["body_json"];
 
     assert_eq!(echo["method"], "POST");
-    assert!(echo["headers"]["content-type"].as_str().unwrap().starts_with("application/json"));
+    assert!(echo["headers"]["content-type"]
+        .as_str()
+        .unwrap()
+        .starts_with("application/json"));
     let body: serde_json::Value = serde_json::from_str(echo["body"].as_str().unwrap()).unwrap();
     assert_eq!(body, json!({ "name": "Ada", "age": 30, "active": true }));
 }
@@ -162,7 +172,7 @@ async fn data_casting_in_body() {
     assert_eq!(body["id_str"], json!("7")); // to_string(7) -> string
     assert_eq!(body["active"], json!(true));
     assert_eq!(body["encoded"], json!("{\"a\":1}")); // json_encode -> string
-    // temple Decimals bridge to serde_json as strings (exact, never f64).
+                                                     // temple Decimals bridge to serde_json as strings (exact, never f64).
     assert_eq!(body["price"], json!("19.99"));
 }
 
@@ -224,7 +234,14 @@ async fn request_scoped_vars_build_headers() {
           : input.response
     }}"#;
     let addr = common::spawn_echo().await;
-    let data = base(addr, vec![("id", Value::Int(7)), ("token", s("tok")), ("trace", s("trace-9"))]);
+    let data = base(
+        addr,
+        vec![
+            ("id", Value::Int(7)),
+            ("token", s("tok")),
+            ("trace", s("trace-9")),
+        ],
+    );
     let out = run_contract(src, data).await;
     let echo = &out["body_json"];
 
@@ -266,7 +283,10 @@ async fn content_type_with_charset_is_preserved_exactly() {
     }}"#;
     let addr = common::spawn_echo().await;
     let out = run_contract(src, base(addr, vec![])).await;
-    assert_eq!(out["body_json"]["headers"]["content-type"], "application/json; charset=utf-8");
+    assert_eq!(
+        out["body_json"]["headers"]["content-type"],
+        "application/json; charset=utf-8"
+    );
 }
 
 #[tokio::test]
@@ -279,7 +299,10 @@ async fn body_without_content_type_defaults_to_json() {
     let addr = common::spawn_echo().await;
     let out = run_contract(src, base(addr, vec![])).await;
     let echo = &out["body_json"];
-    assert!(echo["headers"]["content-type"].as_str().unwrap().starts_with("application/json"));
+    assert!(echo["headers"]["content-type"]
+        .as_str()
+        .unwrap()
+        .starts_with("application/json"));
     let body: serde_json::Value = serde_json::from_str(echo["body"].as_str().unwrap()).unwrap();
     assert_eq!(body, json!({ "k": 1 }));
 }
