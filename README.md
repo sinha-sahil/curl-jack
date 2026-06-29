@@ -101,11 +101,11 @@ let output = run(&template, data).await?;   // free-form serde_json::Value
 ```
 
 > [!NOTE]
-> `run` is the whole API. In the **request** branch your data is at `input.request`; in the **response** branch the [`ApiResponse`](#apiresponse) is at `input.response`. wire-jack injects the `input.phase` flag to pick the branch.
+> `run` is the whole API. In the **request** branch your data is at `input.request`; in the **response** branch the original request data remains at `input.request` and the [`ApiResponse`](#apiresponse) is at `input.response`. wire-jack injects the `input.phase` flag to pick the branch.
 
 ## Templating — phases & variables
 
-Because the ternary short-circuits, only the active branch is evaluated — the request phase never touches `input.response`, and vice-versa.
+Because the ternary short-circuits, only the active branch is evaluated. The request phase never touches `input.response`; the response phase can read both the original `input.request` and the received `input.response`.
 
 > [!TIP]
 > A top-level `let` preamble evaluates in **both** phases, so a binding that reaches a phase-specific key must use optional access from the first hop — `input?.request?.id`. For variables that should exist in **one** phase only, put a `let … in` *inside* that branch — it evaluates only when the branch is taken, so plain access is safe:
