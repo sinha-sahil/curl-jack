@@ -8,7 +8,7 @@ A contract is **one** [temple-dsl](https://github.com/sinha-sahil/temple-dsl) te
 {{
   input.phase == "request"
     ? { …ApiRequest… }        # build the request from input.request.*
-    : { …free-form output… }  # shape the response from input.response.*
+    : { …free-form output… }  # shape the response from input.request.* and input.response.*
 }}
 ```
 
@@ -21,10 +21,10 @@ A contract is **one** [temple-dsl](https://github.com/sinha-sahil/temple-dsl) te
 | `input.phase` | Your data | Must produce |
 |---|---|---|
 | `"request"` | `input.request.*` (whatever you passed to `run`) | an `ApiRequest` object |
-| `"response"` | `input.response.*` (the [`ApiResponse`](README.md#apiresponse)) | any JSON shape |
+| `"response"` | `input.request.*` (the original data) and `input.response.*` (the [`ApiResponse`](README.md#apiresponse)) | any JSON shape |
 
 - Reserved top-level keys are `phase`, `request`, `response`. Your data lives under `input.request` regardless of its type (object, string, number, array).
-- In the request phase `input.response` does **not** exist, and vice-versa. The ternary short-circuits, so never read the other phase's data inside a branch.
+- In the request phase `input.response` does **not** exist. In the response phase `input.request` is still available, so response mapping can combine the original input with the API response.
 
 ## 3. The request object
 
@@ -78,10 +78,10 @@ The request "type" is not a field — it is whatever `Content-Type` says. Set th
 
 Chain bindings: `let a = … in let b = … in { … }`.
 
-**Top-level `let`** evaluates in **both** phases — guard phase-specific reads with optional access from the first hop, or it errors in the other phase:
+**Top-level `let`** evaluates in **both** phases — guard response-only reads with optional access from the first hop, or they error in the request phase:
 
 ```jsonc
-let token = input?.request?.token   # null in the response phase, no error
+let status = input?.response?.status   # null in the request phase, no error
 ```
 
 `this.key` reads a sibling key of the object you are building.
@@ -109,7 +109,7 @@ let token = input?.request?.token   # null in the response phase, no error
 - **`method` is a string** — data-carrying enums don't render.
 - **Decimals become JSON strings** in a body (exact, never `f64`); integers stay numbers. `to_number("19.99")` → `"19.99"` on the wire.
 - **Cast before stringy fields** — `to_string(n)` for anything going into `url` / `headers` / `query`.
-- **Don't cross phases** — `input.response` is absent in the request branch, `input.request` is absent in the response branch.
+- **Don't read `input.response` in the request branch** — it only exists after the HTTP call. `input.request` is available in both branches.
 
 ## 8. Full example
 

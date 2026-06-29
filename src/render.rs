@@ -17,12 +17,17 @@ fn render_request(template: &Template, data: impl Into<Value>) -> Result<ApiRequ
         .map_err(|e| WireJackError::Render(e.to_string()))
 }
 
-fn render_response(template: &Template, response: &ApiResponse) -> Result<serde_json::Value> {
+fn render_response(
+    template: &Template,
+    request: Value,
+    response: &ApiResponse,
+) -> Result<serde_json::Value> {
     let response_value: Value = serde_json::to_value(response)
         .map_err(|e| WireJackError::Render(e.to_string()))?
         .into();
     let input = Value::obj([
         ("phase", Value::Str(PHASE_RESPONSE.into())),
+        ("request", request),
         ("response", response_value),
     ]);
     template
@@ -32,9 +37,10 @@ fn render_response(template: &Template, response: &ApiResponse) -> Result<serde_
 }
 
 pub async fn run(template: &Template, data: impl Into<Value>) -> Result<serde_json::Value> {
-    let request = render_request(template, data)?;
+    let request_data = data.into();
+    let request = render_request(template, request_data.clone())?;
     let response = crate::execute(&request).await?;
-    render_response(template, &response)
+    render_response(template, request_data, &response)
 }
 
 #[cfg(test)]
@@ -72,7 +78,8 @@ mod tests {
             body_json: Some(serde_json::json!({ "id": 7 })),
             ..Default::default()
         };
-        let out = render_response(&contract(), &response).unwrap();
+        let out =
+            render_response(&contract(), Value::obj([("id", Value::Int(7))]), &response).unwrap();
         assert_eq!(out["userId"], serde_json::json!(7));
         assert_eq!(out["ok"], serde_json::json!(true));
     }

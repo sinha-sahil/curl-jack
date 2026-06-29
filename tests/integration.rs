@@ -270,6 +270,36 @@ async fn response_phase_reshape_and_casting() {
 }
 
 #[tokio::test]
+async fn response_phase_can_read_original_request_data() {
+    let src = r#"{{
+        input.phase == "request"
+          ? {
+              "url":    concat(input.request.base, "/items"),
+              "method": "GET",
+              "query":  { "id": to_string(input.request.id) }
+            }
+          : {
+              "requested_id": input.request.id,
+              "requested_provider": input.request.provider,
+              "echoed_query": input.response.body_json.query
+            }
+    }}"#;
+    let addr = common::spawn_echo().await;
+    let out = run_contract(
+        src,
+        base(
+            addr,
+            vec![("id", Value::Int(42)), ("provider", s("EXPRESS"))],
+        ),
+    )
+    .await;
+
+    assert_eq!(out["requested_id"], json!(42));
+    assert_eq!(out["requested_provider"], json!("EXPRESS"));
+    assert_eq!(out["echoed_query"], json!("id=42"));
+}
+
+#[tokio::test]
 async fn content_type_with_charset_is_preserved_exactly() {
     let src = r#"{{
         input.phase == "request"
