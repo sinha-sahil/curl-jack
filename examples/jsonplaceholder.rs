@@ -27,8 +27,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     })?;
 
     for id in [1, 2] {
-        let output = run(&template, Value::obj([("id", Value::Int(id))])).await?;
-        println!("id={id} ->\n{}\n", serde_json::to_string_pretty(&output)?);
+        let result = run(&template, Value::obj([("id", Value::Int(id))])).await?;
+        println!(
+            "id={id} ({} {}) ->\n{}\n",
+            result.response.status,
+            result.response.status_text,
+            serde_json::to_string_pretty(&result.output)?
+        );
     }
     Ok(())
 }

@@ -6,7 +6,8 @@ use tokio::net::{TcpListener, TcpStream};
 // Spawns an echo server: every request is answered with a JSON document
 // describing what was received (method, path, query, headers, body), so tests
 // can assert how the executor built the request. `GET /text` instead returns a
-// `text/plain` body, for exercising response classification.
+// `text/plain` body, for exercising response classification, and
+// `GET /status/<code>` returns that status with a JSON error body.
 pub async fn spawn_echo() -> SocketAddr {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
@@ -68,7 +69,18 @@ async fn handle(sock: &mut TcpStream) -> std::io::Result<()> {
         body.extend_from_slice(&tmp[..n]);
     }
 
-    let (content_type, payload) = if path == "/text" {
+    let status_line = path
+        .strip_prefix("/status/")
+        .and_then(|c| c.parse::<u16>().ok())
+        .map(|code| format!("{code} Error"))
+        .unwrap_or_else(|| "200 OK".to_string());
+
+    let (content_type, payload) = if path.starts_with("/status/") {
+        (
+            "application/json",
+            br#"{"error":"simulated failure"}"#.to_vec(),
+        )
+    } else if path == "/text" {
         ("text/plain", b"hello world".to_vec())
     } else {
         let echo = serde_json::json!({
@@ -82,7 +94,7 @@ async fn handle(sock: &mut TcpStream) -> std::io::Result<()> {
     };
 
     let head = format!(
-        "HTTP/1.1 200 OK\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status_line}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         payload.len()
     );
     sock.write_all(head.as_bytes()).await?;
