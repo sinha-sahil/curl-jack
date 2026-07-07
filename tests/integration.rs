@@ -1,10 +1,10 @@
 use serde_json::json;
-use wire_jack::{run, Template, Value};
+use wire_jack::{run, RunResult, Template, Value, WireJackError};
 
 mod common;
 
-async fn run_contract(src: &str, data: Value) -> serde_json::Value {
-    let template = Template::compile(src).unwrap_or_else(|e| {
+fn compile(src: &str) -> Template {
+    Template::compile(src).unwrap_or_else(|e| {
         panic!(
             "{}",
             e.iter()
@@ -12,8 +12,15 @@ async fn run_contract(src: &str, data: Value) -> serde_json::Value {
                 .collect::<Vec<_>>()
                 .join("\n")
         )
-    });
-    run(&template, data).await.unwrap()
+    })
+}
+
+async fn run_full(src: &str, data: Value) -> RunResult {
+    run(&compile(src), data).await.unwrap()
+}
+
+async fn run_contract(src: &str, data: Value) -> serde_json::Value {
+    run_full(src, data).await.output
 }
 
 fn base(addr: std::net::SocketAddr, pairs: Vec<(&str, Value)>) -> Value {
@@ -375,6 +382,58 @@ async fn binary_octet_stream_body_is_base64_decoded() {
     assert_eq!(echo["method"], "PUT");
     assert_eq!(echo["headers"]["content-type"], "application/octet-stream");
     assert_eq!(echo["body"], "hello");
+}
+
+#[tokio::test]
+async fn run_result_carries_raw_response_on_error_status() {
+    let src = r#"{{
+        input.phase == "request"
+          ? { "url": concat(input.request.base, "/status/400"), "method": "GET" }
+          : { "handled": input.response.ok }
+    }}"#;
+    let addr = common::spawn_echo().await;
+    let result = run_full(src, base(addr, vec![])).await;
+
+    assert_eq!(result.output["handled"], json!(false));
+    assert_eq!(result.response.status, 400);
+    assert!(!result.response.ok);
+    assert_eq!(
+        result.response.body_json,
+        Some(json!({ "error": "simulated failure" }))
+    );
+}
+
+#[tokio::test]
+async fn run_result_carries_raw_response_on_success() {
+    let src = r#"{{
+        input.phase == "request"
+          ? { "url": concat(input.request.base, "/echo"), "method": "GET" }
+          : { "method": input.response.body_json.method }
+    }}"#;
+    let addr = common::spawn_echo().await;
+    let result = run_full(src, base(addr, vec![])).await;
+
+    assert_eq!(result.output["method"], "GET");
+    assert_eq!(result.response.status, 200);
+    assert!(result.response.ok);
+}
+
+#[tokio::test]
+async fn render_error_on_error_status_names_the_status() {
+    let src = r#"{{
+        input.phase == "request"
+          ? { "url": concat(input.request.base, "/status/503"), "method": "GET" }
+          : { "id": input.response.body_json.id }
+    }}"#;
+    let addr = common::spawn_echo().await;
+    let err = run(&compile(src), base(addr, vec![])).await.unwrap_err();
+
+    match err {
+        WireJackError::Render(msg) => {
+            assert!(msg.contains("503"), "missing status in: {msg}");
+        }
+        other => panic!("expected render error, got: {other}"),
+    }
 }
 
 #[tokio::test]

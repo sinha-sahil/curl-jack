@@ -37,8 +37,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ("token", Value::Str("abc123".into())),
         ("trace", Value::Str("trace-9".into())),
     ]);
-    let output = run(&template, data).await?;
-    println!("{}", serde_json::to_string_pretty(&output)?);
+    let result = run(&template, data).await?;
+    println!("{}", serde_json::to_string_pretty(&result.output)?);
 
     Ok(())
 }

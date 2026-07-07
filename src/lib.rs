@@ -12,6 +12,8 @@
 //! ```text
 //! run(template, data): render request -> ApiRequest -> execute -> ApiResponse -> render response
 //! ```
+//!
+//! [`run`] returns a [`RunResult`]: the rendered output plus the raw [`ApiResponse`].
 
 pub mod error;
 pub mod execute;
@@ -20,7 +22,7 @@ pub mod request;
 pub mod response;
 
 pub use error::{Result, WireJackError};
-pub use render::run;
+pub use render::{run, RunResult};
 pub use request::{ApiRequest, Auth, Retry};
 pub use response::ApiResponse;
 

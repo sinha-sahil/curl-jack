@@ -97,11 +97,13 @@ let template = Template::from_bytes(&blob)?;
 
 // Render the request, execute it, render the response — in one call.
 let data = Value::obj([("id", Value::Int(42)), ("token", Value::Str("abc".into()))]);
-let output = run(&template, data).await?;   // free-form serde_json::Value
+let result = run(&template, data).await?;
+result.output;    // free-form serde_json::Value rendered by the response phase
+result.response;  // the raw ApiResponse — status, headers, body, ok
 ```
 
 > [!NOTE]
-> `run` is the whole API. In the **request** branch your data is at `input.request`; in the **response** branch the original request data remains at `input.request` and the [`ApiResponse`](#apiresponse) is at `input.response`. wire-jack injects the `input.phase` flag to pick the branch.
+> `run` is the whole API. In the **request** branch your data is at `input.request`; in the **response** branch the original request data remains at `input.request` and the [`ApiResponse`](#apiresponse) is at `input.response`. wire-jack injects the `input.phase` flag to pick the branch. The returned `RunResult` always carries the raw `ApiResponse` next to the rendered output, so 4xx/5xx details are never lost — even when the template only maps the success shape.
 
 ## Templating — phases & variables
 

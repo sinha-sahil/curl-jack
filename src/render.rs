@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use temple_dsl::{Template, Value};
 
 use crate::error::{Result, WireJackError};
@@ -6,6 +7,12 @@ use crate::response::ApiResponse;
 
 const PHASE_REQUEST: &str = "request";
 const PHASE_RESPONSE: &str = "response";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunResult {
+    pub output: serde_json::Value,
+    pub response: ApiResponse,
+}
 
 fn render_request(template: &Template, data: impl Into<Value>) -> Result<ApiRequest> {
     let input = Value::obj([
@@ -30,17 +37,20 @@ fn render_response(
         ("request", request),
         ("response", response_value),
     ]);
-    template
-        .render_value(input)
-        .map(Into::into)
-        .map_err(|e| WireJackError::Render(e.to_string()))
+    template.render_value(input).map(Into::into).map_err(|e| {
+        WireJackError::Render(format!(
+            "response phase failed for {} {} response: {e}",
+            response.status, response.status_text
+        ))
+    })
 }
 
-pub async fn run(template: &Template, data: impl Into<Value>) -> Result<serde_json::Value> {
+pub async fn run(template: &Template, data: impl Into<Value>) -> Result<RunResult> {
     let request_data = data.into();
     let request = render_request(template, request_data.clone())?;
     let response = crate::execute(&request).await?;
-    render_response(template, request_data, &response)
+    let output = render_response(template, request_data, &response)?;
+    Ok(RunResult { output, response })
 }
 
 #[cfg(test)]
